@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Câmara IoT</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f4f6f9;
+      text-align: center;
+      padding: 60px 20px;
+      transition: background 0.5s, color 0.5s;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+    }
+
+    .controls, .status-panel {
+      margin-top: 30px;
+    }
+
+    button {
+      font-size: 18px;
+      padding: 12px 28px;
+      margin: 10px;
+      border: 2px solid #ccc;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: 0.3s;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+
+    #ligar { background-color: #4CAF50; color: white; border-color: #4CAF50; }
+    #ligar:hover { background-color: #3e8e41; }
+
+    #desligar { background-color: #e74c3c; color: white; border-color: #e74c3c; }
+    #desligar:hover { background-color: #c0392b; }
+
+    #toggle-som { background-color: #3498db; color: white; border-color: #3498db; }
+    #toggle-som:hover { background-color: #2980b9; }
+
+    #logout { background-color: #95a5a6; color: white; border-color: #95a5a6; }
+    #logout:hover { background-color: #7f8c8d; }
+
+    .info-box {
+      background: white;
+      border: 2px solid #d1d1d1;
+      border-radius: 20px;
+      padding: 20px 30px;
+      margin: 20px auto;
+      max-width: 500px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .info-box span.icon {
+      font-size: 22px;
+      color: #007bff;
+    }
+
+    body.escuro {
+      background: #121212;
+      color: #eee;
+    }
+
+    body.escuro h1 {
+      color: white !important;
+    }
+
+    body.escuro .info-box {
+      background: #1e1e1e;
+      color: #ddd;
+      border-color: #333;
+      box-shadow: 0 8px 20px rgba(255,255,255,0.05);
+    }
+
+    #figura {
+      position: absolute;
+      top: 85%;
+      left: -100px;
+      width: 80px;
+      height: auto;
+      animation: none;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    @keyframes correr {
+      0%   { left: -100px; opacity: 1; }
+      50%  { left: 50%; opacity: 1; }
+      100% { left: 110%; opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="erro-alerta" style="display:none; background-color:#e74c3c; color:white; padding:20px; font-size:20px; position:fixed; top:0; left:0; width:100%; z-index:1000; text-align:center;">
+    <i class="fas fa-exclamation-triangle"></i> Corte de Energia Inesperado, Câmara Desligada!
+  </div>
+  <h1><i class="fas fa-video"></i> Controlo da Câmara IoT</h1>
+
+  <div class="controls">
+    <button id="ligar"><i class="fas fa-play"></i> Ligar</button>
+    <button id="desligar"><i class="fas fa-stop"></i> Desligar</button>
+    <button id="toggle-som"><i class="fas fa-volume-up"></i> Som: Ativo</button>
+    <button id="logout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+  </div>
+
+  <div class="status-panel">
+    <div class="info-box" id="estado"><span class="icon"><i class="fas fa-power-off"></i></span>Estado: Desligado</div>
+    <div class="info-box" id="modo"><span class="icon"><i class="fas fa-adjust"></i></span>Modo: -</div>
+    <div class="info-box" id="atividade"><span class="icon"><i class="fas fa-eye"></i></span>A vigiar, a aguardar movimento...</div>
+    <div class="info-box" id="som"><span class="icon"><i class="fas fa-volume-up"></i></span>Som: Ativo</div>
+  </div>
+
+  <img id="figura" src="correr.gif" alt="Pessoa a correr">
+
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script>
+    const broker = "wss://YOUR-NGROK-URL.ngrok-free.app"; // Substituir se mudares o ngrok
+    const username = sessionStorage.getItem("user");
+    const password = sessionStorage.getItem("pass");
+
+    if (!username || !password) {
+      alert("Acesso negado. Faça login primeiro.");
+      window.location.href = "login.html";
+    }
+
+    const client = mqtt.connect(broker, { username, password });
+    let gravando = false;
+    let modoAnterior = null;
+    let somAtivo = true;
+
+    function addLog(msg) {
+      console.log(msg);
+    }
+
+    client.on("connect", () => {
+      client.subscribe("camera/status");
+      client.subscribe("camera/modo");
+      client.subscribe("camera/gravar");
+      client.subscribe("camera/som");
+      client.subscribe("camera/erro"); // ✅ subscrição do som
+    });
+
+    client.on("message", (topic, message) => {
+      const msg = message.toString();
+
+      if (topic === "camera/status") {
+        const estadoDiv = document.getElementById("estado");
+        let icone = msg === "ON" ? "<i class='fas fa-video'></i>" : "<i class='fas fa-power-off'></i>";
+        estadoDiv.innerHTML = `<span class="icon">${icone}</span>Estado: ${msg === "ON" ? "Ligado" : "Desligado"}`;
+        if (msg === "OFF") {
+          document.getElementById("atividade").innerHTML = "<span class='icon'><i class='fas fa-eye-slash'></i></span>Desligada";
+        }
+      }
+
+      if (topic === "camera/modo") {
+        const modoDiv = document.getElementById("modo");
+        let icone = msg === "NOTURNO" ? "<i class='fas fa-moon'></i>" : "<i class='fas fa-sun'></i>";
+        modoDiv.innerHTML = `<span class="icon">${icone}</span>Modo: ${msg}`;
+        document.body.classList.toggle("escuro", msg === "NOTURNO");
+
+        if (modoAnterior !== msg) {
+          modoAnterior = msg;
+          fetch("https://ntfy.sh/noturno-ligado-1717", {
+            method: "POST",
+            body: `🌗 Modo alterado para: ${msg}`
+          });
+        }
+      }
+
+      if (topic === "camera/gravar") {
+        gravando = true;
+        const figura = document.getElementById("figura");
+        const atividade = document.getElementById("atividade");
+        atividade.innerHTML = "<span class='icon'><i class='fas fa-record-vinyl'></i></span>A gravar...";
+
+        fetch("https://ntfy.sh/movimento-detetado-1717", {
+          method: "POST",
+          body: "🎯 Movimento Detetado!"
+        });
+
+        figura.style.animation = "none";
+        figura.offsetHeight;
+        figura.style.animation = "correr 2s linear";
+        figura.style.opacity = "1";
+
+        setTimeout(() => {
+          figura.style.animation = "none";
+          figura.style.opacity = "0";
+          gravando = false;
+          atividade.innerHTML = "<span class='icon'><i class='fas fa-eye'></i></span>A vigiar, a aguardar movimento...";
+        }, 5000);
+      }
+
+      
+      if (topic === "camera/erro") {
+        const alerta = document.getElementById("erro-alerta");
+        alerta.style.display = "block";
+
+        fetch("https://ntfy.sh/erro-camera-desligada", {
+          method: "POST",
+          body: "🚨 A câmara desligou-se inesperadamente (ex: corte de energia)."
+        });
+
+        setTimeout(() => {
+          alerta.style.display = "none";
+        }, 10000);
+      }
+
+      if (topic === "camera/som") {
+        const somAnterior = somAtivo;
+        somAtivo = msg === "ON";
+        const icone = somAtivo ? "fa-volume-up" : "fa-volume-mute";
+
+        document.getElementById("toggle-som").innerHTML = `<i class="fas ${icone}"></i> Som: ${somAtivo ? "Ativo" : "Mutado"}`;
+        document.getElementById("som").innerHTML = `<span class="icon"><i class="fas ${icone}"></i></span>Som: ${somAtivo ? "Ativo" : "Mutado"}`;
+
+      if (somAnterior !== somAtivo) {
+        fetch("https://ntfy.sh/som-muted-1717", {
+        method: "POST",
+        body: `🔊 Som alterado para: ${somAtivo ? "Ativo" : "Mutado"}`
+    });
+  }
+}
+    });
+
+    document.getElementById("ligar").onclick = () => {
+      client.publish("camera/control", "ON", { retain: true });
+      fetch("https://ntfy.sh/led-ligado-1717", {
+        method: "POST",
+        body: "📹 Câmara ligada!"
+      });
+    };
+
+    document.getElementById("desligar").onclick = () => {
+      client.publish("camera/control", "OFF", { retain: true });
+      fetch("https://ntfy.sh/led-ligado-1717", {
+        method: "POST",
+        body: "📴 Câmara desligada!"
+      });
+    };
+
+    document.getElementById("toggle-som").onclick = () => {
+      somAtivo = !somAtivo;
+      const estado = somAtivo ? "ON" : "OFF";
+      const icone = somAtivo ? "fa-volume-up" : "fa-volume-mute";
+
+      client.publish("camera/som", estado, { retain: true });
+      document.getElementById("toggle-som").innerHTML = `<i class="fas ${icone}"></i> Som: ${somAtivo ? "Ativo" : "Mutado"}`;
+      document.getElementById("som").innerHTML = `<span class="icon"><i class="fas ${icone}"></i></span>Som: ${somAtivo ? "Ativo" : "Mutado"}`;
+    };
+
+    document.getElementById("logout").onclick = () => {
+      client.end();
+      sessionStorage.clear();
+      window.location.href = "login.html";
+    };
+  </script>
+</body>
+</html>

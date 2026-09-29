@@ -1,0 +1,9 @@
+# Wi-Fi credentials saved on the device by the provisioning portal
+config.json
+
+# Python
+__pycache__/
+
+# OS
+.DS_Store
+Thumbs.db

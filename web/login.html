@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Login - Câmara IoT</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .login-box {
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #0077cc;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover {
+      background: #005fa3;
+    }
+    #erro {
+      color: red;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <h2>Login para controlo da câmara</h2>
+    <input type="text" id="user" placeholder="Utilizador">
+    <input type="password" id="pass" placeholder="Password">
+    <button onclick="login()">Entrar</button>
+    <p id="erro"></p>
+  </div>
+
+  <script>
+    function login() {
+      const user = document.getElementById("user").value;
+      const pass = document.getElementById("pass").value;
+
+      if ((user === "teste" && pass === "123") || (user === "convidado" && pass === "1234")) {
+        sessionStorage.setItem("user", user);
+        sessionStorage.setItem("pass", pass);
+        window.location.href = "index_mqtt_login.html";
+      } else {
+        document.getElementById("erro").innerText = "Credenciais inválidas.";
+      }
+    }
+  </script>
+</body>
+</html>

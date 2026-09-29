@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Câmara IoT</title>
+  <style>
+    body { font-family: Arial; text-align: center; margin-top: 50px; }
+    button { font-size: 20px; padding: 10px 20px; margin-top: 20px; }
+    #estado { font-weight: bold; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Controlo da Câmara IoT</h1>
+  <button id="botao">Desligar</button>
+  <div id="estado">Estado: Ligado</div>
+
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script>
+    const broker = "wss://YOUR-NGROK-URL.ngrok-free.app";
+    const options = {
+      username: "teste",
+      password: "123"
+    };
+    const client = mqtt.connect(broker, options);
+
+    let cameraLigada = true;
+
+    client.on("connect", () => {
+      console.log("Ligado ao broker MQTT");
+      client.subscribe("camera/status");
+      client.publish("camera/control", "ON", { retain: true });
+    });
+
+    client.on("message", (topic, message) => {
+      if (topic === "camera/status") {
+        const estado = message.toString();
+        document.getElementById("estado").innerText = "Estado: " + estado;
+        cameraLigada = (estado !== "OFF");
+        document.getElementById("botao").innerText = cameraLigada ? "Desligar" : "Ligar";
+      }
+    });
+
+    document.getElementById("botao").onclick = () => {
+      const novoEstado = cameraLigada ? "OFF" : "ON";
+      client.publish("camera/control", novoEstado, { retain: true });
+    };
+  </script>
+</body>
+</html>
